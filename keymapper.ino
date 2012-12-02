@@ -6,7 +6,6 @@
 #include <usb_ch9.h>
 #include <Usb.h>
 #include <usbhub.h>
-#include <avr/pgmspace.h>
 #include <address.h>
 #include <hidboot.h>
 
@@ -24,7 +23,7 @@
 
 
 // function definitions
-bool HandleReservedKeystrokes(uint8_t mod, uint8_t key);
+bool HandleReservedKeystrokes(HID *hid, uint8_t *buf);
 void play_word_game(void);
 
 
@@ -42,15 +41,15 @@ typedef enum
     dvorak
 } KeyboardLayout;
 
-// keymap based on the scancodes from 4 to 57, refer to the HID usage table on the meaning of each element
+// Keymap based on the scancodes from 4 to 57, refer to the HID usage table on the meaning of each element
 PROGMEM prog_uint8_t qwertyKeymap[] = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57};
-PROGMEM prog_uint8_t tarmak1Keymap[] = {4, 5, 6, 7, 13, 9, 10, 11, 12, 17, 8, 15, 16, 14, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57};
-PROGMEM prog_uint8_t tarmak2Keymap[] = {4, 5, 6, 7, 9, 23, 13, 11, 12, 17, 8, 15, 16, 14, 18, 19, 20, 21, 22, 10, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57};
-PROGMEM prog_uint8_t tarmak3Keymap[] = {4, 5, 6, 7, 9, 23, 51, 11, 12, 17, 8, 15, 16, 14, 28, 19, 20, 21, 22, 10, 24, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 57};
-PROGMEM prog_uint8_t tarmak4Keymap[] = {4, 5, 6, 7, 9, 23, 51, 11, 24, 17, 8, 12, 16, 14, 28, 19, 20, 21, 22, 10, 15, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 57};
-PROGMEM prog_uint8_t colemakKeymap[] = {4, 5, 6, 22, 9, 23, 7, 11, 24, 17, 8, 12, 16, 14, 28, 51, 20, 19, 21, 10, 15, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 57};
+PROGMEM prog_uint8_t tarmak1Keymap[] = {4, 5, 6, 7, 13, 9, 10, 11, 12, 17, 8, 15, 16, 14, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 42};
+PROGMEM prog_uint8_t tarmak2Keymap[] = {4, 5, 6, 7, 9, 23, 13, 11, 12, 17, 8, 15, 16, 14, 18, 19, 20, 21, 22, 10, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 42};
+PROGMEM prog_uint8_t tarmak3Keymap[] = {4, 5, 6, 7, 9, 23, 51, 11, 12, 17, 8, 15, 16, 14, 28, 19, 20, 21, 22, 10, 24, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 42};
+PROGMEM prog_uint8_t tarmak4Keymap[] = {4, 5, 6, 7, 9, 23, 51, 11, 24, 17, 8, 12, 16, 14, 28, 19, 20, 21, 22, 10, 15, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 42};
+PROGMEM prog_uint8_t colemakKeymap[] = {4, 5, 6, 22, 9, 23, 7, 11, 24, 17, 8, 12, 16, 14, 28, 51, 20, 19, 21, 10, 15, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 42};
 
-const uint8_t *keymap[] =
+const uint8_t *Keymap[] =
 {   
     qwertyKeymap,
     tarmak1Keymap,
@@ -60,205 +59,123 @@ const uint8_t *keymap[] =
     colemakKeymap
 };
 
-
-uint8_t keyBuffer[8] = {0,0,0,0,0,0,0,0};
+// global variables
 //uint32_t ledBlinkTime = millis();
 //uint16_t ledBlinkDelay = 500;
 //bool ledStatus = false;
-KeyboardLayout currentLayout = qwerty;
-
+KeyboardLayout CurrentLayout = qwerty;
+uint8_t KeyBuffer[8] = {0,0,0,0,0,0,0,0};
 
 class KbdRptParser : public KeyboardReportParser
 {
-    void PrintKey(uint8_t mod, uint8_t key);
-        
 protected:
-    virtual void OnKeyDown (uint8_t mod, uint8_t key);
-    virtual void OnKeyUp (uint8_t mod, uint8_t key);
     virtual void Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf);
 };
 
-void KbdRptParser::PrintKey(uint8_t m, uint8_t key)    
-{
-    
-    MODIFIERKEYS mod;
-    *((uint8_t*)&mod) = m;
-    
-    Serial.print((mod.bmLeftCtrl   == 1) ? "C" : " ");
-    Serial.print((mod.bmLeftShift  == 1) ? "S" : " ");
-    Serial.print((mod.bmLeftAlt    == 1) ? "A" : " ");
-    Serial.print((mod.bmLeftGUI    == 1) ? "G" : " ");
-    
-    Serial.print(" >");
-    Serial.print (key);
-    Serial.print (" : ");
-    PrintHex<uint8_t>(key);
-    Serial.print("< ");
 
-    Serial.print((mod.bmRightCtrl   == 1) ? "C" : " ");
-    Serial.print((mod.bmRightShift  == 1) ? "S" : " ");
-    Serial.print((mod.bmRightAlt    == 1) ? "A" : " ");
-    Serial.println((mod.bmRightGUI  == 1) ? "G" : " ");
+// *******************************************************************************************
+// Parse
+// *******************************************************************************************
+
+void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
+{
+	// On error - return
+	if (buf[2] == 1)
+		return;
+
+    // for (uint8_t i=0; i<8; i++)
+    // {
+        // PrintHex(buf[i]);
+        // Serial.print(" ");
+    // }
+    // Serial.println("");
+
+    KeyBuffer[0] = buf[0];
+    
+    if (!HandleReservedKeystrokes(hid, buf))
+    {
+        // remap all keys according to the existing keymap
+        for (uint8_t i=2; i<8; i++)
+        {
+			// handle special case of Shift-CAPSLOCK to be ignored by the remapper
+			if (buf[i] == KEY_CAPS_LOCK && buf[0] & 0x22)
+				KeyBuffer[i] = buf[i];
+			else
+			{
+				// print the key based on the current layout
+				if (buf[i]>=4 && buf[i]-4 < 54)        	// transpose of 4 becoz our array starts from 0 but A is 4
+														// limit check to 57, which is the last mappable key (CAPSLOCK)
+					KeyBuffer[i] = pgm_read_byte(Keymap[CurrentLayout]+buf[i]-4);
+				else
+					KeyBuffer[i] = buf[i];
+			}
+			
+			// check locking keys
+			HandleLockingKeys(hid, KeyBuffer[i]);
+        }
+        
+        // send out key press
+        HID_SendReport(2,KeyBuffer,sizeof(KeyBuffer));
+
+        // for (uint8_t i=0; i<8; i++)
+        // {
+            // PrintHex(KeyBuffer[i]);
+            // Serial.print(" ");
+        // }
+        // Serial.println("");
+        // Serial.println("");
+        
+    }
 
 };
 
-void KbdRptParser::OnKeyDown(uint8_t mod, uint8_t key)    
-{
 
-#ifdef DEBUG
-    Serial.print("DN ");
-    PrintKey(mod, key);
-#endif
+bool HandleReservedKeystrokes(HID *hid, uint8_t *buf) // return true if it is a reserved keystroke
+{
+    uint8_t mod = buf[0];       // read the modifier byte
     
-    if (!HandleReservedKeystrokes(mod, key))
-    {
-        // print the key based on the current layout
-        if (key-4 < 54)        // transpose of 4 becoz our array starts from 0 but A is 4
-                               // limit check to 57, which is the last mappable key (CAPSLOCK)
-            key = pgm_read_byte(keymap[currentLayout]+key-4);
+    uint8_t numKeysPressed = 0;
+    uint8_t keyPosition = 0;
     
-        keyBuffer[0] = mod;
-        keyBuffer[2] = key;
-        
-        HID_SendReport(2,keyBuffer,sizeof(keyBuffer));    
+    // check that there is only 1 single key that is pressed
+    for (uint8_t i=2; i<8; i++) if (buf[i] > 0) {
+        numKeysPressed++;
+        keyPosition = i;
     }
-}
-
-void KbdRptParser::OnKeyUp(uint8_t mod, uint8_t key)    
-{
-#ifdef DEBUG
-    Serial.print("UP ");
-    PrintKey(mod, key);
-#endif
+	
+    if (numKeysPressed != 1) return false;	// only allow single keypress for reserved keystrokes (besides modifiers)
     
-    keyBuffer[0] = 0;
-    keyBuffer[2] = 0;
-       
-    HID_SendReport(2,keyBuffer,sizeof(keyBuffer));
-
-}
-
-// Copy and pasted over from Oleg's library in preparation for next major revision
-
-// void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
-// {
-// Serial.println ("This is my own parse function!");
-
-	// // On error - return
-	// if (buf[2] == 1)
-		// return;
-		
-	// KBDINFO	*pki = (KBDINFO*)buf;
-
-	// for (uint8_t i=2; i<8; i++)
-	// {
-		// bool down = true;
-		// bool up	  = true;
-
-		// for (uint8_t j=2; j<8; j++)
-		// {
-			// if (buf[i] == prevState.bInfo[j] && buf[i] != 1)	// if at least one of the keys are the same
-				// down = false;									// as the previous state, then it could not 
-																// // have been pressed again
-			// if (buf[j] == prevState.bInfo[i] && prevState.bInfo[i] != 1)	// if any of the keys in the previous
-				// up = false;													// is found now, then it has not been
-		// }																	// released
-			
-		// if (down)
-		// {
-			// HandleLockingKeys(hid, buf[i]);
-			// OnKeyDown(*buf, buf[i]);
-			// }
-		// if (up)
-		// {
-			// OnKeyUp(prevState.bInfo[0], prevState.bInfo[i]);
-		// }
-	// }
-
-	// // handle modifier keys
-	// if ( (buf[0] & 0x01) > (prevState.bInfo[0] & 0x01))		// left CTRL was pressed
-		// OnKeyDown (*buf, 0xe0);
-	// if ( (buf[0] & 0x01) < (prevState.bInfo[0] & 0x01))		// left CTRL was release
-		// OnKeyUp (prevState.bInfo[0], 0xe0);
-
-	// if ( (buf[0] & 0x02) > (prevState.bInfo[0] & 0x02))		// left SHIFT was pressed
-		// OnKeyDown (*buf, 0xe1);
-	// if ( (buf[0] & 0x02) < (prevState.bInfo[0] & 0x02))		// left SHIFT was release
-		// OnKeyUp (prevState.bInfo[0], 0xe1);
-		
-	// if ( (buf[0] & 0x04) > (prevState.bInfo[0] & 0x04))		// left ALT was pressed
-		// OnKeyDown (*buf, 0xe2);
-	// if ( (buf[0] & 0x04) < (prevState.bInfo[0] & 0x04))		// left ALT was release
-		// OnKeyUp (prevState.bInfo[0], 0xe2);
-		
-	// if ( (buf[0] & 0x08) > (prevState.bInfo[0] & 0x08))		// left GUI was pressed
-		// OnKeyDown (*buf, 0xe3);
-	// if ( (buf[0] & 0x08) < (prevState.bInfo[0] & 0x08))		// left GUI was release
-		// OnKeyUp (prevState.bInfo[0], 0xe3);
-
-	// if ( (buf[0] & 0x10) > (prevState.bInfo[0] & 0x10))		// right CTRL was pressed
-		// OnKeyDown (*buf, 0xe4);
-	// if ( (buf[0] & 0x10) < (prevState.bInfo[0] & 0x10))		// right CTRL was release
-		// OnKeyUp (prevState.bInfo[0], 0xe4);
-
-	// if ( (buf[0] & 0x20) > (prevState.bInfo[0] & 0x20))		// right SHIFT was pressed
-		// OnKeyDown (*buf, 0xe5);
-	// if ( (buf[0] & 0x20) < (prevState.bInfo[0] & 0x20))		// right SHIFT was release
-		// OnKeyUp (prevState.bInfo[0], 0xe5);
-		
-	// if ( (buf[0] & 0x40) > (prevState.bInfo[0] & 0x40))		// right ALT was pressed
-		// OnKeyDown (*buf, 0xe6);
-	// if ( (buf[0] & 0x40) < (prevState.bInfo[0] & 0x40))		// right ALT was release
-		// OnKeyUp (prevState.bInfo[0], 0xe6);
-		
-	// if ( (buf[0] & 0x80) > (prevState.bInfo[0] & 0x80))		// right GUI was pressed
-		// OnKeyDown (*buf, 0xe7);
-	// if ( (buf[0] & 0x80) < (prevState.bInfo[0] & 0x80))		// right GUI was release
-		// OnKeyUp (prevState.bInfo[0], 0xe7);
-
-
-
-
-	// /*
-	// for (uint8_t i=0; i<8; i++)
-		// prevState.bInfo[i] = buf[i];
-	// */
-	// memcpy(prevState.bInfo, buf, 8);		// potentially faster than the loop? code seems to compile smaller also
-// };
-
-
-bool HandleReservedKeystrokes(uint8_t mod, uint8_t key) // return true if it is a reserved keystroke
-{
+    
     // check if we are changing layouts
     if ((mod & 0x22) && (mod & 0x11))  {        // Shift-Alt keystrokes
-        switch (key) {
+        switch (buf[keyPosition]) {
             case 0x27:    // 0
-                currentLayout = qwerty;
+                CurrentLayout = qwerty;
                 digitalWrite(modeLED, LOW);
                 return true;
 
             case 0x1e:    // 1
-                currentLayout = tarmak1;
+                CurrentLayout = tarmak1;
                 digitalWrite(modeLED, HIGH);
                 return true;
 
             case 0x1f:    // 2
-                currentLayout = tarmak2;
+                CurrentLayout = tarmak2;
                 digitalWrite(modeLED, HIGH);
                 return true;
 
             case 0x20:    // 3
-                currentLayout = tarmak3;
+                CurrentLayout = tarmak3;
                 digitalWrite(modeLED, HIGH);
                 return true;
 
             case 0x21:    // 4
-                currentLayout = tarmak4;
+                CurrentLayout = tarmak4;
                 digitalWrite(modeLED, HIGH);
                 return true;
 
             case 0x22:    // 5
-                currentLayout = colemak;
+                CurrentLayout = colemak;
                 digitalWrite(modeLED, HIGH);
                 return true;
 
@@ -267,26 +184,15 @@ bool HandleReservedKeystrokes(uint8_t mod, uint8_t key) // return true if it is 
                 return true;
         }
     }
-
-// note that in the current implementation of HandleReservedKeystrokes, this
-// part of the code will never get called even if DEBUG is defined
-#ifdef DEBUG
-    Serial.print("Current layout: ");
-    Serial.println(currentLayout);
-    
-    for (uint8_t i=0; i<54; i++)
-        Serial.println(pgm_read_byte(keymap[currentLayout]+i));
-#endif
-
+	
     return false;
-
 
 }
 
 
-// *******************************
-// ****     WORD GAME!!!       ***
-// *******************************
+// *******************************************************************************************
+// WORD GAME!!!
+// *******************************************************************************************
 
 void play_word_game(void)
 {
@@ -296,7 +202,7 @@ void play_word_game(void)
 
     uint16_t randNum;
 
-    switch (currentLayout) {
+    switch (CurrentLayout) {
         case tarmak1:
             strcpy (priorityAlphabets, "nek");
             break;
@@ -363,8 +269,6 @@ void setup()
 
     // initialize the digital pin as an output.
     pinMode(modeLED, OUTPUT);  
-
-
 
     Keyboard.begin();
 
