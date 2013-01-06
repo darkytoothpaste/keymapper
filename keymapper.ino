@@ -18,14 +18,14 @@
 
 //#define DEBUG
 #define modeLED 13
-
+#define TEENSY
 
 
 
 // function definitions
 bool HandleReservedKeystrokes(HID *hid, uint8_t *buf);
+inline void SendKeysToHost (uint8_t *buf);
 void play_word_game(void);
-
 
 
 
@@ -79,6 +79,8 @@ protected:
 
 void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
 {
+	uint8_t i;
+  
 	// On error - return
 	if (buf[2] == 1)
 		return;
@@ -92,10 +94,11 @@ void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
 
     KeyBuffer[0] = buf[0];
     
+    
     if (!HandleReservedKeystrokes(hid, buf))
     {
         // remap all keys according to the existing keymap
-        for (uint8_t i=2; i<8; i++)
+        for (i=2; i<8; i++)
         {
 			// handle special case of Shift-CAPSLOCK to be ignored by the remapper
 			if (buf[i] == KEY_CAPS_LOCK && buf[0] & 0x22)
@@ -103,7 +106,7 @@ void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
 			else
 			{
 				// print the key based on the current layout
-				if (buf[i]>=4 && buf[i]-4 < 54)        	// transpose of 4 becoz our array starts from 0 but A is 4
+				if (buf[i]>=4 && buf[i] <= 57)        	// transpose of 4 becoz our array starts from 0 but A is 4
 														// limit check to 57, which is the last mappable key (CAPSLOCK)
 					KeyBuffer[i] = pgm_read_byte(Keymap[CurrentLayout]+buf[i]-4);
 				else
@@ -115,7 +118,7 @@ void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
         }
         
         // send out key press
-        HID_SendReport(2,KeyBuffer,sizeof(KeyBuffer));
+		SendKeysToHost (KeyBuffer);
 
         // for (uint8_t i=0; i<8; i++)
         // {
@@ -145,7 +148,8 @@ bool HandleReservedKeystrokes(HID *hid, uint8_t *buf) // return true if it is a 
 	
     if (numKeysPressed != 1) return false;	// only allow single keypress for reserved keystrokes (besides modifiers)
     
-    
+	
+	
     // check if we are changing layouts
     if ((mod & 0x22) && (mod & 0x11))  {        // Shift-Alt keystrokes
         switch (buf[keyPosition]) {
@@ -188,6 +192,26 @@ bool HandleReservedKeystrokes(HID *hid, uint8_t *buf) // return true if it is a 
     return false;
 
 }
+
+inline void SendKeysToHost (uint8_t *buf)
+{
+#ifdef TEENSY
+    Keyboard.set_modifier(buf[0]);
+	Keyboard.set_key1(buf[2]);
+	Keyboard.set_key2(buf[3]);
+	Keyboard.set_key3(buf[4]);
+	Keyboard.set_key4(buf[5]);
+	Keyboard.set_key5(buf[6]);
+	Keyboard.set_key6(buf[7]);
+	Keyboard.send_now();
+#else
+	HID_SendReport(2,buf,8);
+#endif
+
+}
+
+
+
 
 
 // *******************************************************************************************
@@ -252,7 +276,7 @@ void play_word_game(void)
   
 USB     Usb;
 //USBHub     Hub(&Usb);
-HIDBoot<HID_PROTOCOL_KEYBOARD>    Keyboard2(&Usb);
+HIDBoot<HID_PROTOCOL_KEYBOARD>    ExtKeyboard(&Usb);
 
 uint32_t next_time;
 
@@ -289,7 +313,7 @@ void setup()
 
     next_time = millis() + 5000;
 
-    Keyboard2.SetReportParser(0, (HIDReportParser*)&Prs);
+    ExtKeyboard.SetReportParser(0, (HIDReportParser*)&Prs);
 }
 
 void loop()
