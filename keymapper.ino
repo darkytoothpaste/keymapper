@@ -26,7 +26,7 @@
 bool HandleReservedKeystrokes(HID *hid, uint8_t *buf);
 inline void SendKeysToHost (uint8_t *buf);
 void play_word_game(void);
-
+inline void LatchKey (uint8_t keyToLatch);
 
 
 // variable definitions
@@ -62,9 +62,12 @@ const uint8_t *Keymap[] =
 // global variables
 //uint32_t ledBlinkTime = millis();
 //uint16_t ledBlinkDelay = 500;
-//bool ledStatus = false;
+
 KeyboardLayout CurrentLayout = qwerty;
 uint8_t KeyBuffer[8] = {0,0,0,0,0,0,0,0};
+uint8_t specialKeyLatch=0;
+bool specialKeyLatchReleased = false;
+
 
 class KbdRptParser : public KeyboardReportParser
 {
@@ -97,36 +100,60 @@ void KbdRptParser::Parse(HID *hid, bool is_rpt_id, uint8_t len, uint8_t *buf)
     
     if (!HandleReservedKeystrokes(hid, buf))
     {
-        // remap all keys according to the existing keymap
-        for (i=2; i<8; i++)
+      specialKeyLatchReleased = true;
+      
+      // remap all keys according to the existing keymap
+      for (i=2; i<8; i++)
+      {
+        
+        // handle special case of Shift-CAPSLOCK to be ignored by the remapper
+        if (buf[i] == KEY_CAPS_LOCK && buf[0] & 0x22)
         {
-			// handle special case of Shift-CAPSLOCK to be ignored by the remapper
-			if (buf[i] == KEY_CAPS_LOCK && buf[0] & 0x22)
-				KeyBuffer[i] = buf[i];
-			else
-			{
-				// print the key based on the current layout
-				if (buf[i]>=4 && buf[i] <= 57)        	// transpose of 4 becoz our array starts from 0 but A is 4
-														// limit check to 57, which is the last mappable key (CAPSLOCK)
-					KeyBuffer[i] = pgm_read_byte(Keymap[CurrentLayout]+buf[i]-4);
-				else
-					KeyBuffer[i] = buf[i];
-			}
-			
-			// check locking keys
-			HandleLockingKeys(hid, KeyBuffer[i]);
+          KeyBuffer[i] = KEY_CAPS_LOCK;
+          LatchKey(KEY_CAPS_LOCK);
+        }
+        else
+        {
+          // print the key based on the current layout
+          if (buf[i]>=4 && buf[i] <= 57)     	// transpose of 4 becoz our array starts from 0 but A is 4
+                                              // limit check to 57, which is the last mappable key (CAPSLOCK)
+          {
+            // if it was a special key of shift-CAPS, then only allow mapping if the key has been released at least once
+            if (buf[i] != specialKeyLatch)
+              KeyBuffer[i] = pgm_read_byte(Keymap[CurrentLayout]+buf[i]-4);
+            else  // key is not released yet. do not allow mapping
+            {
+              // Serial.println("key is not released");
+              KeyBuffer[i] = 0;
+              specialKeyLatchReleased = false;
+            }
+          }
+          else
+            KeyBuffer[i] = buf[i];
         }
         
-        // send out key press
-		SendKeysToHost (KeyBuffer);
 
-        // for (uint8_t i=0; i<8; i++)
-        // {
-            // PrintHex(KeyBuffer[i]);
-            // Serial.print(" ");
-        // }
-        // Serial.println("");
-        // Serial.println("");
+        // check locking keys
+        HandleLockingKeys(hid, KeyBuffer[i]);
+      }
+      
+      // reset latch if key is released
+      if (specialKeyLatchReleased)
+      {
+        // Serial.println("latch is released");
+        specialKeyLatch = 0;
+      }
+      
+      // send out key press
+      SendKeysToHost (KeyBuffer); 
+
+    // for (uint8_t i=0; i<8; i++)
+    // {
+        // PrintHex(KeyBuffer[i]);
+        // Serial.print(" ");
+    // }
+    // Serial.println("");
+    // Serial.println("");
         
     }
 
@@ -156,37 +183,45 @@ bool HandleReservedKeystrokes(HID *hid, uint8_t *buf) // return true if it is a 
             case 0x27:    // 0
                 CurrentLayout = qwerty;
                 digitalWrite(modeLED, LOW);
+                LatchKey(buf[keyPosition]);
                 return true;
 
             case 0x1e:    // 1
                 CurrentLayout = tarmak1;
                 digitalWrite(modeLED, HIGH);
+                LatchKey(buf[keyPosition]);
                 return true;
 
             case 0x1f:    // 2
                 CurrentLayout = tarmak2;
                 digitalWrite(modeLED, HIGH);
+                LatchKey(buf[keyPosition]);
                 return true;
 
             case 0x20:    // 3
                 CurrentLayout = tarmak3;
                 digitalWrite(modeLED, HIGH);
+                LatchKey(buf[keyPosition]);
                 return true;
 
             case 0x21:    // 4
                 CurrentLayout = tarmak4;
                 digitalWrite(modeLED, HIGH);
+                LatchKey(buf[keyPosition]);
                 return true;
 
             case 0x22:    // 5
                 CurrentLayout = colemak;
                 digitalWrite(modeLED, HIGH);
+                LatchKey(buf[keyPosition]);
                 return true;
 
             case 0x2c:    // space bar
                 play_word_game();
+                LatchKey(buf[keyPosition]);
                 return true;
         }
+
     }
 	
     return false;
@@ -196,7 +231,7 @@ bool HandleReservedKeystrokes(HID *hid, uint8_t *buf) // return true if it is a 
 inline void SendKeysToHost (uint8_t *buf)
 {
 #ifdef TEENSY
-    Keyboard.set_modifier(buf[0]);
+  Keyboard.set_modifier(buf[0]);
 	Keyboard.set_key1(buf[2]);
 	Keyboard.set_key2(buf[3]);
 	Keyboard.set_key3(buf[4]);
@@ -208,6 +243,15 @@ inline void SendKeysToHost (uint8_t *buf)
 	HID_SendReport(2,buf,8);
 #endif
 
+}
+
+
+inline void LatchKey (uint8_t keyToLatch)
+{
+  specialKeyLatch = keyToLatch;
+  specialKeyLatchReleased = false;
+  // Serial.print(keyToLatch);
+  // Serial.println(" is latched");
 }
 
 
