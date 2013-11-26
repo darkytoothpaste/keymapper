@@ -1,26 +1,12 @@
 #include <avr/pgmspace.h>
-
-#include <avrpins.h>
-#include <max3421e.h>
-#include <usbhost.h>
-#include <usb_ch9.h>
 #include <Usb.h>
-#include <usbhub.h>
-#include <address.h>
 #include <hidboot.h>
-
-#include <printhex.h>
-#include <message.h>
-#include <hexdump.h>
-#include <parsetools.h>
 
 #include "keymapper_game.h"
 
 //#define DEBUG
 #define modeLED 13
-#define TEENSY
-
-
+//#define TEENSY
 
 // function definitions
 bool HandleReservedKeystrokes(HID *hid, uint8_t *buf);
@@ -48,6 +34,8 @@ PROGMEM prog_uint8_t tarmak2Keymap[] = {4, 5, 6, 7, 9, 23, 13, 11, 12, 17, 8, 15
 PROGMEM prog_uint8_t tarmak3Keymap[] = {4, 5, 6, 7, 9, 23, 51, 11, 12, 17, 8, 15, 16, 14, 28, 19, 20, 21, 22, 10, 24, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 42};
 PROGMEM prog_uint8_t tarmak4Keymap[] = {4, 5, 6, 7, 9, 23, 51, 11, 24, 17, 8, 12, 16, 14, 28, 19, 20, 21, 22, 10, 15, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 42};
 PROGMEM prog_uint8_t colemakKeymap[] = {4, 5, 6, 22, 9, 23, 7, 11, 24, 17, 8, 12, 16, 14, 28, 51, 20, 19, 21, 10, 15, 25, 26, 27, 13, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 18, 52, 53, 54, 55, 56, 42};
+PROGMEM prog_uint8_t dvorakKeymap[] = {4, 27, 13, 8, 55, 24, 12, 7, 6, 11, 23, 17, 16, 5, 21, 15, 52, 19, 18, 28, 10, 14, 54, 20, 9, 51, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 47, 48, 56, 46, 49, 50, 22, 45, 53, 26, 25, 29, 57};
+
 
 const uint8_t *Keymap[] =
 {   
@@ -56,7 +44,8 @@ const uint8_t *Keymap[] =
     tarmak2Keymap,
     tarmak3Keymap,
     tarmak4Keymap,
-    colemakKeymap
+    colemakKeymap,
+    dvorakKeymap
 };
 
 // global variables
@@ -212,6 +201,12 @@ bool HandleReservedKeystrokes(HID *hid, uint8_t *buf) // return true if it is a 
 
             case 0x22:    // 5
                 CurrentLayout = colemak;
+                digitalWrite(modeLED, HIGH);
+                LatchKey(buf[keyPosition]);
+                return true;
+                
+            case 0x23:    // 6
+                CurrentLayout = dvorak;
                 digitalWrite(modeLED, HIGH);
                 LatchKey(buf[keyPosition]);
                 return true;
