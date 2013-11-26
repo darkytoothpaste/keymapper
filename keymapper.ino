@@ -20,7 +20,7 @@ Ctrl-Shift 7 => Workman
 
 //#define DEBUG
 #define modeLED 13
-//#define TEENSY
+//#define TEENSY   //uncomment this line if you are usin Teensy
 
 
 // function definitions

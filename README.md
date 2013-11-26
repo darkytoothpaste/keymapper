@@ -10,7 +10,7 @@ What you can do with it?
 3. Just think about it!
 
 
-How to use this
+How to use this?
 ====
 ##Hardware support
 * Arduino Leonardo with [Circuits@Home USB Host Shield 2.0](http://www.circuitsathome.com/products-page/arduino-shields/usb-host-shield-2-0-for-arduino-assembled)
